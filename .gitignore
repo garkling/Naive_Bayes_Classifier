@@ -1,0 +1,5 @@
+*.zip
+data/
+stop_words.txt
+intro-R.Rmd
+*.Rproj
