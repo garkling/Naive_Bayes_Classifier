@@ -3,3 +3,4 @@ data/
 stop_words.txt
 intro-R.Rmd
 *.Rproj
+.Rproj.user
