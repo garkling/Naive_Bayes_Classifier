@@ -146,8 +146,8 @@ list.files("data/0-authors")
 ```
 
 ```{r}
-test_path <- "data/0-authors/test.csv"
-train_path <- "data/0-authors/train.csv"
+test_path <- "data/1-discrimination/test.csv"
+train_path <- "data/1-discrimination/train.csv"
 
 stop_words <- read_file("stop_words.txt")
 # https://stackoverflow.com/questions/27195912/why-does-strsplit-return-a-list
@@ -162,10 +162,17 @@ test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
 
 ```{r}
 # note the power functional features of R bring us! 
-tidy_text <- unnest_tokens(train, 'splitted', 'text', token="words") %>%
-             filter(!splitted %in% stop_words)
+tidy_text <- unnest_tokens(train, 'word', 'tweet', token="words") %>%
+             filter(!word %in% splitted_stop_words)
+```
 
-tidy_text %>% count(splitted,sort=TRUE)
+```{r}
+# count the words with respect to label
+word_counts <- tidy_text %>% count(label, word, sort = TRUE)
+
+# count the total number of tweets for each label
+tweet_counts <- tidy_text %>%
+  count(label)
 ```
 
 ## Data visualization
