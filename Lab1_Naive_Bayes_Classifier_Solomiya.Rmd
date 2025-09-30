@@ -100,6 +100,9 @@ library(tidytext)
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(tidyverse)
+
+
 ```
 
 ## Outline of the work
@@ -142,12 +145,12 @@ library(ggplot2)
 
 ```{r}
 list.files(getwd())
-list.files("data/0-authors")
+list.files("data/1-discrimination")
 ```
 
 ```{r}
-test_path <- "data/0-authors/test.csv"
-train_path <- "data/0-authors/train.csv"
+test_path <- "data/1-discrimination/test.csv"
+train_path <- "data/1-discrimination/train.csv"
 
 stop_words <- read_file("stop_words.txt")
 # https://stackoverflow.com/questions/27195912/why-does-strsplit-return-a-list
@@ -160,12 +163,62 @@ train <-  read.csv(file = train_path, stringsAsFactors = FALSE)
 test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
 ```
 
-```{r}
-# note the power functional features of R bring us! 
-tidy_text <- unnest_tokens(train, 'splitted', 'text', token="words") %>%
-             filter(!splitted %in% stop_words)
+``` {r}
+clean_data <-function(df){
+  df$tweet <- df$tweet %>%
+    str_replace_all("https?://\\S+|www\\.\\S+", "") %>%
+    str_replace_all("@\\w+", "") %>%
+    tolower() %>%
+    str_replace_all("#", "") %>%
+    str_replace_all("[[:punct:]]", "") %>%
+    str_replace_all("\\d+", "") %>%
+    str_replace_all("\\s+", " ") %>%
+    str_trim()
 
-tidy_text %>% count(splitted,sort=TRUE)
+  return(df)
+}
+
+train_clean <- clean_data(train)
+test_clean <- clean_data(test)
+```
+
+
+```{r}
+
+
+# note the power functional features of R bring us! 
+tidy_text <- unnest_tokens(train_clean, 'word', 'tweet', token="words") %>%
+             filter(!word %in% splitted_stop_words)%>%
+              filter(nchar(word) > 2)  %>%
+              filter(str_detect(word, "^[a-z]+$"))
+
+tidy_test <- unnest_tokens(test_clean, 'word', 'tweet', token="words") %>%
+             filter(!word %in% splitted_stop_words) %>%
+             filter(nchar(word) > 2) %>%
+            filter(str_detect(word, "^[a-z]+$"))
+
+```
+
+```{r}
+# count the words with respect to label
+word_counts <- tidy_text %>% count(label, word, sort = TRUE)
+
+# count the total number of tweets for each label
+tweet_counts <- tidy_text %>%
+  count(label)
+```
+
+```{r}
+train_bow <- tidy_text %>%
+  count(id, label, word) %>%    # Count word frequency per tweet
+  arrange(id)
+
+# BAG-OF-WORDS for test messages  
+test_bow <- tidy_test %>%
+  count(id, word) %>%
+  left_join(test %>% select(id, label), by = "id") %>%  # Add labels for evaluation
+  arrange(id)
+
 ```
 
 ## Data visualization
@@ -174,6 +227,139 @@ Each time you work with some data, you need to understand it before you
 start processing it. R has very powerful tools to make nice plots and
 visualization. Show what are the most common words for negative and
 positive examples as a histogram, word cloud etc. Be creative!
+
+
+``` {r}
+# Top 15 words per label
+top_words <- word_counts %>%
+  group_by(label) %>%
+  slice_max(n, n = 15) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, n, label))
+
+ggplot(top_words, aes(x = word, y = n, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~label, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top 15 Most Common Words by Label",
+       subtitle = "Discrimination vs Neutral Tweets",
+       x = "Words",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, face = "bold"))
+```
+
+
+```{r}
+# Enhanced bar chart with percentages
+tweet_dist <- tweet_counts %>%
+  mutate(
+    percentage = round(100 * n / sum(n), 1),
+    label_text = paste0(label, "\n", n, " tweets\n(", percentage, "%)")
+  )
+
+ggplot(tweet_dist, aes(x = label, y = n, fill = label)) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = label_text), vjust = -0.5, size = 5, fontface = "bold") +
+  scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
+  labs(
+    title = "Dataset Distribution",
+    subtitle = "Balance between discriminatory and neutral tweets",
+    x = NULL,
+    y = "Number of Tweets"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(face = "bold", size = 12)
+  ) +
+  ylim(0, max(tweet_dist$n) * 1.15)
+
+
+
+```
+
+
+```{r}
+# Calculate TF-IDF - finds distinctive words
+tfidf_analysis <- tidy_text %>%
+  count(label, word) %>%
+  bind_tf_idf(word, label, n) %>%
+  arrange(desc(tf_idf))
+
+# Visualize top distinctive words
+top_tfidf <- tfidf_analysis %>%
+  group_by(label) %>%
+  slice_max(tf_idf, n = 12) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, tf_idf, label))
+
+ggplot(top_tfidf, aes(x = tf_idf, y = word, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~label, scales = "free") +
+  scale_y_reordered() +
+  scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
+  labs(
+    title = "Most Distinctive Words by Category (TF-IDF)",
+    subtitle = "Words that uniquely characterize discriminatory vs neutral tweets",
+    x = "TF-IDF Score (Importance)",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+
+
+
+```
+
+```{r}
+
+
+library(wordcloud)
+library(RColorBrewer)
+
+# Create side-by-side word clouds
+par(mfrow = c(1, 2), bg = "white")
+
+# Discriminatory tweets
+discrim_data <- word_counts %>% filter(label == "discrim")
+wordcloud(
+  words = discrim_data$word,
+  freq = discrim_data$n,
+  min.freq = 5,
+  max.words = 80,
+  random.order = FALSE,
+  rot.per = 0.3,
+  colors = brewer.pal(8, "Reds")
+)
+title("Discriminatory Tweets", col.main = "#e74c3c", cex.main = 1.5, font.main = 2)
+
+# Neutral tweets
+neutral_data <- word_counts %>% filter(label == "neutral")
+wordcloud(
+  words = neutral_data$word,
+  freq = neutral_data$n,
+  min.freq = 5,
+  max.words = 80,
+  random.order = FALSE,
+  rot.per = 0.3,
+  colors = brewer.pal(8, "Blues")
+)
+title("Neutral Tweets", col.main = "#3498db", cex.main = 1.5, font.main = 2)
+
+par(mfrow = c(1, 1))
+
+
+```
+``` {r}
+
+
+```
 
 ## Classifier implementation
 
