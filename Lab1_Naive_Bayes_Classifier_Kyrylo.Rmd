@@ -248,7 +248,10 @@ naiveBayes <- setRefClass("naiveBayes",
                     # return prediction for a single message 
                     predict = function(message)
                     {
-                         words <- unlist(strsplit(tolower(message), "\\s+"))
+                         words <- message %>%
+                          tibble(text = .) %>%
+                          unnest_tokens(word, text) %>%
+                          pull(word)
                          probabilities <- numeric(length(classes))
                          names(probabilities) <- classes
                          
