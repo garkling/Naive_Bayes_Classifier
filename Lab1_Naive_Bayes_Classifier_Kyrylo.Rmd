@@ -163,16 +163,32 @@ test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
 ```{r}
 # note the power functional features of R bring us! 
 tidy_text <- unnest_tokens(train, 'word', 'tweet', token="words") %>%
-             filter(!word %in% splitted_stop_words)
+             filter(!word %in% splitted_stop_words) %>%
+             filter(nchar(word) > 2) %>%
+             filter(word != "user")
 ```
 
 ```{r}
 # count the words with respect to label
-word_counts <- tidy_text %>% count(label, word, sort = TRUE)
+word_counts <- tidy_text %>% count(label, word)
 
 # count the total number of tweets for each label
 tweet_counts <- tidy_text %>%
+  distinct(id, label) %>%
+  count(label) %>%
+  mutate(probability = n / sum(n))
+
+# count the total number of words for each label
+totals <- tidy_text %>%
   count(label)
+
+totals <- setNames(totals$n, totals$label)
+
+unique_words <- distinct(tidy_text, word)
+word_probabilities <<- word_counts %>% mutate(prob = (n + 1) / (totals[label]))
+
+tweet_counts$probability[tweet_counts$label == "discrims"]
+
 ```
 
 ## Data visualization
@@ -189,20 +205,70 @@ naiveBayes <- setRefClass("naiveBayes",
                           
        # here it would be wise to have some vars to store intermediate result
        # frequency dict etc. Though pay attention to bag of words! 
-       fields = list(),
+       fields = list(
+                    class_probabilities = "data.frame",  # probability of any sentence to be in a certain class
+                    total_word_counts = "integer",  # number of words for each class
+                    word_probabilities = "data.frame",  # probability for each word to appear in a certain class
+                    vocabulary = "data.frame",  # unique words across all classes
+                    vocabulary_size = "integer",  # num of unique words across all classes
+                    classes = "character"  # all classes
+       ),
        methods = list(
                     # prepare your training data as X - bag of words for each of your
                     # messages and corresponding label for the message encoded as 0 or 1 
                     # (binary classification task)
                     fit = function(X, y)
                     {
-                         # TODO
+                         classes <<- unique(X$label)
+                         class_probabilities <<- X %>%
+                           distinct(id, label) %>%
+                           count(label) %>%
+                           mutate(prob = n / sum(n))
+                         
+                         vocabulary <<- distinct(X, word)
+                         vocabulary_size <<- nrow(vocabulary)
+                         
+                         # don't ask. this is spaghetti code, i know
+                         all_word_counts <- count(X, label)
+                         total_word_counts <<- setNames(all_word_counts$n, all_word_counts$label)
+                         
+                         word_counts <- X %>% count(label, word)
+                         # get all combos of any possible word and class
+                         all_combos <- expand_grid(label = classes, word = vocabulary$word)
+
+                         # join with actual word counts, fill missing with 0
+                         word_counts_complete <- all_combos %>%
+                           left_join(word_counts, by = c("label", "word")) %>%
+                           mutate(n = replace_na(n, 0))
+
+                         word_probabilities <<- word_counts_complete %>% 
+                           mutate(prob = (n + 1) / (total_word_counts[label] + vocabulary_size))
                     },
                     
                     # return prediction for a single message 
                     predict = function(message)
                     {
-                         # TODO
+                         words <- unlist(strsplit(tolower(message), "\\s+"))
+                         probabilities <- numeric(length(classes))
+                         names(probabilities) <- classes
+                         
+                         for(class in classes) {
+                           p_class <- class_probabilities$prob[class_probabilities$label == class]
+                           all_words_probability <- 1
+                           
+                           for (word in words) {
+                             if (word %in% vocabulary$word) {
+                               word_probability <- word_probabilities$prob[word_probabilities$word == word & 
+                                                       word_probabilities$label == class]
+                             }
+                             else {
+                               word_probability <- 1 / (total_word_counts[class] + vocabulary_size)
+                             }
+                             all_words_probability <- all_words_probability * word_probability
+                           }
+                           probabilities[class] <- all_words_probability * p_class
+                         }
+                         return(names(which.max(probabilities)))
                     },
                     
                     # score you test set so to get the understanding how well you model
@@ -217,7 +283,7 @@ naiveBayes <- setRefClass("naiveBayes",
 ))
 
 model = naiveBayes()
-model$fit()
+model$fit(tidy_text)
 ```
 
 ## Measure effectiveness of your classifier
