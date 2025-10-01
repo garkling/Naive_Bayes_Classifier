@@ -100,6 +100,7 @@ library(tidytext)
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(tidyverse)
 ```
 
 ## Outline of the work
@@ -168,29 +169,6 @@ tidy_text <- unnest_tokens(train, 'word', 'tweet', token="words") %>%
              filter(word != "user")
 ```
 
-```{r}
-# count the words with respect to label
-word_counts <- tidy_text %>% count(label, word)
-
-# count the total number of tweets for each label
-tweet_counts <- tidy_text %>%
-  distinct(id, label) %>%
-  count(label) %>%
-  mutate(probability = n / sum(n))
-
-# count the total number of words for each label
-totals <- tidy_text %>%
-  count(label)
-
-totals <- setNames(totals$n, totals$label)
-
-unique_words <- distinct(tidy_text, word)
-word_probabilities <<- word_counts %>% mutate(prob = (n + 1) / (totals[label]))
-
-tweet_counts$probability[tweet_counts$label == "discrims"]
-
-```
-
 ## Data visualization
 
 Each time you work with some data, you need to understand it before you
@@ -217,7 +195,7 @@ naiveBayes <- setRefClass("naiveBayes",
                     # prepare your training data as X - bag of words for each of your
                     # messages and corresponding label for the message encoded as 0 or 1 
                     # (binary classification task)
-                    fit = function(X, y)
+                    fit = function(X)
                     {
                          classes <<- unique(X$label)
                          class_probabilities <<- X %>%
