@@ -244,7 +244,7 @@ naiveBayes <- setRefClass("naiveBayes",
                                                        word_probabilities$label == class]
                              }
                              else {
-                               word_probability <- 1 / (total_word_counts[class] + vocabulary_size)
+                               word_probability <- 1
                              }
                              all_words_probability <- all_words_probability * word_probability
                            }
