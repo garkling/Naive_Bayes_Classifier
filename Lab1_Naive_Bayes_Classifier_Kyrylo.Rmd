@@ -184,12 +184,12 @@ naiveBayes <- setRefClass("naiveBayes",
        # here it would be wise to have some vars to store intermediate result
        # frequency dict etc. Though pay attention to bag of words! 
        fields = list(
+                    classes = "character",  # all classes
                     class_probabilities = "data.frame",  # probability of any sentence to be in a certain class
                     total_word_counts = "integer",  # number of words for each class
                     word_probabilities = "data.frame",  # probability for each word to appear in a certain class
                     vocabulary = "data.frame",  # unique words across all classes
-                    vocabulary_size = "integer",  # num of unique words across all classes
-                    classes = "character"  # all classes
+                    vocabulary_size = "integer"  # num of unique words across all classes
        ),
        methods = list(
                     # prepare your training data as X - bag of words for each of your
@@ -221,6 +221,7 @@ naiveBayes <- setRefClass("naiveBayes",
 
                          word_probabilities <<- word_counts_complete %>% 
                            mutate(prob = (n + 1) / (total_word_counts[label] + vocabulary_size))
+                         return(list(classes, class_probabilities, total_word_counts, word_probabilities, vocabulary, vocabulary_size))
                     },
                     
                     # return prediction for a single message 
