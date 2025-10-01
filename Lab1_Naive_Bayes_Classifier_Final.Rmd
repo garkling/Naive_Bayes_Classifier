@@ -1,0 +1,596 @@
+---
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Probability and Statistics
+
+# Lab Assignment 1: Naive Bayes Classifier
+
+## Work breakdown
+
+-   *Solomiya Hadiychuk*: **Data pre-processing & visualization**
+-   *Kyrylo Omelianchuk*: **Classifier implementation**
+-   *Vladyslav Bobryk*: **Effectiveness measurements**
+
+## Dataset
+
+-   **1 - discrimination**
+
+## Introduction
+
+During the first three weeks, you learned a couple of essential notions
+and theorems, and one of the most important among them is the **Bayes
+theorem**.
+
+**Naive Bayes Classifier** is a simple algorithm, which is based on
+**Bayes theorem** and used for solving classification problems.
+**Classification problem** is a problem in which an observation has to
+be classified in one of the $n$ classes based on its similarity with
+observations in each class.
+
+It is a **probabilistic classifier**, which means it predicts based on
+the probability of an observation belonging to each class. To compute
+it, this algorithm uses **Bayes' formula,** that you probably already
+came across in **Lesson 3:**
+$$\mathsf{P}(\mathrm{class}\mid \mathrm{observation})=\frac{\mathsf{P}(\mathrm{observation}\mid\mathrm{class})\mathsf{P}(\mathrm{class})}{\mathsf{P}(\mathrm{observation})}$$
+
+Under the strong **independence** assumption, one can calculate
+$\mathsf{P}(\mathrm{observation} \mid \mathrm{class})$ as
+$$\mathsf{P}(\mathrm{observation}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i), \qquad \mathsf{P}(\mathrm{observation} \mid \mathrm{class}) = \prod_{i=1}^{n} \mathsf{P}(\mathrm{feature}_i \mid \mathrm{class}),$$
+where $n$ is the total number of features describing a given observation
+(*For example, if an observation is presented as a sentence, then each
+word can be a feature*). Thus,
+$\mathsf{P}(\mathrm{class}|\mathrm{observation})$ now can be calculated
+as
+
+$$\mathsf{P}(\mathrm{class} \mid \mathrm{\mathrm{observation}}) = \mathsf{P}(\mathrm{class})\times \prod_{i=1}^{n}\frac{\mathsf{P}(\mathrm{feature}_i\mid \mathrm{class})}{\mathsf{P}(\mathrm{feature}_i)}\tag{1}$$
+
+All the terms on the right-hand side can be estimated as corresponding
+relative frequencies using available data\
+
+**See [*this
+link*](https://www.javatpoint.com/machine-learning-naive-bayes-classifier)
+for more detailed explanations & examples :) Also you can watch [*this
+video*](https://youtu.be/O2L2Uv9pdDA?si=-ohkHVDuu3sLLGMq) for more
+examples!**
+
+## Data description
+
+There are 5 datasets uploaded on the cms (data.zip)
+
+To determine your variant, take your team number from the list of teams
+on cms and take *mod 5* - this is the number of your data set.
+
+-   **0 - authors** This data set consists of citations of three famous
+    writers: Edgar Alan Poe, Mary Wollstonecraft Shelley and HP
+    Lovecraft. The task with this data set is to classify a piece of
+    text with the author who was more likely to write it.
+
+-   **1 - discrimination** This data set consists of tweets that have
+    discriminatory (sexism or racism) messages or of tweets that are of
+    neutral mood. The task is to determine whether a given tweet has
+    discriminatory mood or does not. **(our)**
+
+-   **2 - fake news** This data set contains data of American news: a
+    headline and an abstract of the article. Each piece of news is
+    classified as fake or credible. The task is to classify the news
+    from test.csv as credible or fake.
+
+-   **3 - sentiment** All the text messages contained in this data set
+    are labeled with three sentiments: positive, neutral or negative.
+    The task is to classify some text message as the one of positive
+    mood, negative or neutral.
+
+-   **4 - spam** This last data set contains SMS messages classified as
+    spam or non-spam (ham in the data set). The task is to determine
+    whether a given message is spam or non-spam.
+
+Each data set consists of two files: *train.csv* and *test.csv*. The
+first one is used to find the probabilities of the corresponding classes
+and the second one is used to test your classifier afterwards. Note that
+it is crucial to randomly split your data into training and testing
+parts to test the classifierʼs possibilities on the unseen data.
+
+```{r}
+library(tidytext)
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+## Outline of the work
+
+1.  **Data pre-processing** (includes removing punctuation marks and
+    stop words, representing each message as a bag-of-words)
+2.  **Data visualization** (it's time to plot your data!)
+3.  **Classifier implementation** (using the training set, calculate all
+    the conditional probabilities in formula (1))
+4.  **Measurements of effectiveness of your classifier** (use the
+    results from the previous step to predict classes for messages in
+    the testing set and measure the accuracy, precision and recall, F1
+    score metric etc)
+5.  **Conclusions**
+
+*!! do not forget to submit both the (compiled) Rmd source file and the
+.html output !!*
+
+## Data pre-processing
+
+-   Read the *.csv* data files.
+-   Сlear your data from punctuation or other unneeded symbols.
+-   Clear you data from stop words. You don't want words as is, and, or
+    etc. to affect your probabilities distributions, so it is a wise
+    decision to get rid of them. Find list of stop words in the cms
+    under the lab task.
+-   Represent each test message as its bag-of-words. Here:
+    <https://machinelearningmastery.com/gentle-introduction-bag-words-model/>
+    you can find general introduction to the bag-of-words model and
+    examples on to create it.
+-   It is highly recommended to get familiar with R dataframes, it would
+    make the work much easier to do.
+-   Useful links:
+    -   <https://steviep42.github.io/webscraping/book/bagofwords.html#tidytext> -
+        example of using *tidytext* to count frequencies of the words.
+    -   Basics of Text Mining in R:
+        <http://rstudio-pubs-static.s3.amazonaws.com/256588_57b585da6c054349825cba46685d8464.html>
+        . Note that it also includes an example on how to create a bag
+        of words from your text document.
+
+```{r}
+list.files(getwd())
+list.files("data/1-discrimination")
+```
+
+```{r}
+test_path <- "data/1-discrimination/test.csv"
+train_path <- "data/1-discrimination/train.csv"
+
+stop_words <- read_file("stop_words.txt")
+# https://stackoverflow.com/questions/27195912/why-does-strsplit-return-a-list
+splitted_stop_words <- strsplit(stop_words, split='\n')
+splitted_stop_words <- splitted_stop_words[[1]]
+```
+
+```{r}
+train <-  read.csv(file = train_path, stringsAsFactors = FALSE)
+test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
+```
+
+```{r}
+clean_data <-function(df){
+  df$tweet <- df$tweet %>%
+    str_replace_all("https?://\\S+|www\\.\\S+", "") %>%
+    str_replace_all("@\\w+", "") %>%
+    tolower() %>%
+    str_replace_all("#", "") %>%
+    str_replace_all("[[:punct:]]", "") %>%
+    str_replace_all("\\d+", "") %>%
+    str_replace_all("\\s+", " ") %>%
+    str_trim()
+
+  return(df)
+}
+
+train_clean <- clean_data(train)
+test_clean <- clean_data(test)
+```
+
+```{r}
+# note the power functional features of R bring us! 
+tidy_text <- unnest_tokens(train_clean, 'word', 'tweet', token="words") %>%
+             filter(!word %in% splitted_stop_words)%>%
+              filter(nchar(word) > 2)  %>%
+              filter(str_detect(word, "^[a-z]+$"))
+
+tidy_test <- unnest_tokens(test_clean, 'word', 'tweet', token="words") %>%
+             filter(!word %in% splitted_stop_words) %>%
+             filter(nchar(word) > 2) %>%
+            filter(str_detect(word, "^[a-z]+$"))
+```
+
+```{r}
+# count the words with respect to label
+word_counts <- tidy_text %>% count(label, word, sort = TRUE)
+
+# count the total number of tweets for each label
+tweet_counts <- tidy_text %>%
+  count(label)
+```
+
+```{r}
+train_bow <- tidy_text %>%
+  count(id, label, word) %>%    # Count word frequency per tweet
+  arrange(id)
+
+# BAG-OF-WORDS for test messages  
+test_bow <- tidy_test %>%
+  count(id, word) %>%
+  left_join(test %>% select(id, label), by = "id") %>%  # Add labels for evaluation
+  arrange(id)
+```
+
+## Data visualization
+
+Each time you work with some data, you need to understand it before you
+start processing it. R has very powerful tools to make nice plots and
+visualization. Show what are the most common words for negative and
+positive examples as a histogram, word cloud etc. Be creative!
+
+```{r}
+# Top 15 words per label
+top_words <- word_counts %>%
+  group_by(label) %>%
+  slice_max(n, n = 15) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, n, label))
+
+ggplot(top_words, aes(x = word, y = n, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~label, scales = "free_y") +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top 15 Most Common Words by Label",
+       subtitle = "Discrimination vs Neutral Tweets",
+       x = "Words",
+       y = "Frequency") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 16, face = "bold"))
+```
+
+```{r}
+# Enhanced bar chart with percentages
+tweet_dist <- tweet_counts %>%
+  mutate(
+    percentage = round(100 * n / sum(n), 1),
+    label_text = paste0(label, "\n", n, " tweets\n(", percentage, "%)")
+  )
+
+ggplot(tweet_dist, aes(x = label, y = n, fill = label)) +
+  geom_col(width = 0.6, show.legend = FALSE) +
+  geom_text(aes(label = label_text), vjust = -0.5, size = 5, fontface = "bold") +
+  scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
+  labs(
+    title = "Dataset Distribution",
+    subtitle = "Balance between discriminatory and neutral tweets",
+    x = NULL,
+    y = "Number of Tweets"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    axis.text.x = element_text(face = "bold", size = 12)
+  ) +
+  ylim(0, max(tweet_dist$n) * 1.15)
+
+```
+
+```{r}
+# Calculate TF-IDF - finds distinctive words
+tfidf_analysis <- tidy_text %>%
+  count(label, word) %>%
+  bind_tf_idf(word, label, n) %>%
+  arrange(desc(tf_idf))
+
+# Visualize top distinctive words
+top_tfidf <- tfidf_analysis %>%
+  group_by(label) %>%
+  slice_max(tf_idf, n = 12) %>%
+  ungroup() %>%
+  mutate(word = reorder_within(word, tf_idf, label))
+
+ggplot(top_tfidf, aes(x = tf_idf, y = word, fill = label)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~label, scales = "free") +
+  scale_y_reordered() +
+  scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
+  labs(
+    title = "Most Distinctive Words by Category (TF-IDF)",
+    subtitle = "Words that uniquely characterize discriminatory vs neutral tweets",
+    x = "TF-IDF Score (Importance)",
+    y = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    strip.text = element_text(face = "bold", size = 12)
+  )
+```
+
+```{r}
+library(wordcloud)
+library(RColorBrewer)
+
+# Create side-by-side word clouds
+par(mfrow = c(1, 2), bg = "white")
+
+# Discriminatory tweets
+discrim_data <- word_counts %>% filter(label == "discrim")
+wordcloud(
+  words = discrim_data$word,
+  freq = discrim_data$n,
+  min.freq = 5,
+  max.words = 80,
+  random.order = FALSE,
+  rot.per = 0.3,
+  colors = brewer.pal(8, "Reds")
+)
+title("Discriminatory Tweets", col.main = "#e74c3c", cex.main = 1.5, font.main = 2)
+
+# Neutral tweets
+neutral_data <- word_counts %>% filter(label == "neutral")
+wordcloud(
+  words = neutral_data$word,
+  freq = neutral_data$n,
+  min.freq = 5,
+  max.words = 80,
+  random.order = FALSE,
+  rot.per = 0.3,
+  colors = brewer.pal(8, "Blues")
+)
+title("Neutral Tweets", col.main = "#3498db", cex.main = 1.5, font.main = 2)
+
+par(mfrow = c(1, 1))
+```
+
+## Classifier implementation
+
+```{r}
+naiveBayes <- setRefClass("naiveBayes",
+                          
+       # here it would be wise to have some vars to store intermediate result
+       # frequency dict etc. Though pay attention to bag of words! 
+       fields = list(
+                    classes = "character",  # all classes
+                    class_probabilities = "data.frame",  # probability of any sentence to be in a certain class
+                    total_word_counts = "integer",  # number of words for each class
+                    word_probabilities = "data.frame",  # probability for each word to appear in a certain class
+                    vocabulary = "data.frame",  # unique words across all classes
+                    vocabulary_size = "integer"  # num of unique words across all classes
+       ),
+       methods = list(
+                    # prepare your training data as X - bag of words for each of your
+                    # messages and corresponding label for the message encoded as 0 or 1 
+                    # (binary classification task)
+                    fit = function(X)
+                    {
+                         classes <<- unique(X$label)
+                         class_probabilities <<- X %>%
+                           distinct(id, label) %>%
+                           count(label) %>%
+                           mutate(prob = n / sum(n))
+                         
+                         vocabulary <<- distinct(X, word)
+                         vocabulary_size <<- nrow(vocabulary)
+                         
+                         # don't ask. this is spaghetti code, i know
+                         all_word_counts <- count(X, label)
+                         total_word_counts <<- setNames(all_word_counts$n, all_word_counts$label)
+                         
+                         word_counts <- X %>% count(label, word)
+                         # get all combos of any possible word and class
+                         all_combos <- expand_grid(label = classes, word = vocabulary$word)
+
+                         # join with actual word counts, fill missing with 0
+                         word_counts_complete <- all_combos %>%
+                           left_join(word_counts, by = c("label", "word")) %>%
+                           mutate(n = replace_na(n, 0))
+
+                         word_probabilities <<- word_counts_complete %>% 
+                           mutate(prob = (n + 1) / (total_word_counts[label] + vocabulary_size))
+                         return(list(classes = classes, class_probabilities = class_probabilities, total_word_counts = total_word_counts, word_probabilities = word_probabilities, vocabulary = vocabulary, vocabulary_size = vocabulary_size))
+                    },
+                    
+                    # return prediction for a single message 
+                    predict = function(message)
+                    {
+                         words <- message %>%
+                          tibble(text = .) %>%
+                          unnest_tokens(word, text) %>%
+                          pull(word)
+                         probabilities <- numeric(length(classes))
+                         names(probabilities) <- classes
+                         
+                         for(class in classes) {
+                           p_class <- class_probabilities$prob[class_probabilities$label == class]
+                           all_words_probability <- 1
+                           
+                           for (word in words) {
+                             if (word %in% vocabulary$word) {
+                               word_probability <- word_probabilities$prob[word_probabilities$word == word & 
+                                                       word_probabilities$label == class]
+                             }
+                             else {
+                               word_probability <- 1
+                             }
+                             all_words_probability <- all_words_probability * word_probability
+                           }
+                           probabilities[class] <- all_words_probability * p_class
+                         }
+                         return(names(which.max(probabilities)))
+                    }
+))
+
+model = naiveBayes()
+model$fit(tidy_text)
+```
+
+## Measure effectiveness of your classifier
+
+-   Note that accuracy is not always a good metric for your classifier.
+    Look at precision and recall curves, F1 score metric.
+
+    When evaluating the model, it's important to understand the
+    different types of classification results:
+
+    -   A ***true positive*** result is one where the model correctly
+        predicts the positive class.
+    -   A ***true negative*** result is one where the model correctly
+        predicts the negative class.
+    -   A ***false positive*** result is one where the model incorrectly
+        predicts the positive class when it is actually negative.
+    -   A ***false negative*** result is one where the model incorrectly
+        predicts the negative class when it is actually positive.
+
+    Precision measures the proportion of true positive predictions among
+    all positive predictions made by the model.
+
+    $$
+    Precision = \frac{TP}{TP+FP}
+    $$
+
+    Recall, on the other hand, measures the proportion of true positives
+    identified out of all actual positive cases.
+
+    $$
+    Recall = \frac{TP}{TP+FN}
+    $$
+
+    F1 score is the harmonic mean of both precision and recall.
+
+    $$
+    F1 = \frac{2\times Precision \times Recall}{Precision + Recall}
+    $$
+
+    ```{r}
+    binary_factor <- function(y, positive) {
+      y <- factor(y)
+      negatives <- setdiff(levels(y), positive)
+      factor(y, levels = c(negatives, positive))
+    }
+
+    confusion_matrix <- function(y_true, y_pred, positive) {
+      yt <- binary_factor(y_true, positive)
+      yp <- binary_factor(y_pred, positive)
+      tp <- sum(yt == positive & yp == positive, na.rm = TRUE)
+      tn <- sum(yt != positive & yp != positive, na.rm = TRUE)
+      fp <- sum(yt != positive & yp == positive, na.rm = TRUE)
+      fn <- sum(yt == positive & yp != positive, na.rm = TRUE)
+      c(tp = tp, tn = tn, fp = fp, fn = fn)
+    }
+    ```
+
+    ```{r}
+    measurements <- function(y_true, y_pred, positive) {
+      cmatrix <- confusion_matrix(y_true, y_pred, positive)
+      tp <- cmatrix['tp']
+      tn <- cmatrix['tn']
+      fp <- cmatrix['fp']
+      fn <- cmatrix['fn']
+      
+      precision <- if (tp + fp == 0) NA_real_ 
+                   else tp / (tp + fp)
+      recall <- if (tp + fn == 0) NA_real_ 
+                else tp / (tp + fn)
+      f1 <- if (is.na(precision) || is.na(recall) || tp == 0) NA_real_
+            else (2 * precision * recall) / (precision + recall)
+      
+      accuracy <- (tp + tn) / sum(cmatrix)
+      data.frame(tp, tn, fp, fn, precision, recall, f1, accuracy, row.names = NULL)
+    }
+    ```
+
+    ```{r}
+    naiveBayes$methods(
+      score = function(X_test, y_test, positive) {
+        msgs <- X_test
+        # apply prediction to all dataset
+        preds <- vapply(msgs, function(m) .self$predict(m), character(1))
+        
+        # convert list of labels to factor and apply it to y_pred 
+        y_true <- binary_factor(y_test, positive)
+        y_pred <- factor(preds, levels = levels(y_true))
+
+        df <- data.frame(
+          text  = msgs,
+          truth = y_test,
+          pred  = y_pred,
+          stringsAsFactors = FALSE
+        )
+      
+        # define whether this is FP or FN
+        df$case <- with(df, 
+                        ifelse(truth != positive & pred == positive, "FP",
+                        ifelse(truth == positive & pred != positive, "FN", 
+                        "OK"))
+                        )
+      
+        # get only FP and FN subsets
+        FP <- subset(df, case == "FP", select = c(text, truth, pred))
+        FN <- subset(df, case == "FN", select = c(text, truth, pred))
+      
+        # score prediction efficiency
+        ms <- measurements(y_true, y_pred, positive)
+        cm <- table(Truth = y_true, Pred = y_pred)
+
+        invisible(
+          list(
+            measurements = ms, 
+            confusion_matrix = cm, 
+            y_true = y_true, 
+            y_pred = y_pred,
+            topFP = utils::head(FP, 35),
+            topFN = utils::head(FN, 35)
+          )
+        )
+      }
+    )
+    ```
+
+    ```{r}
+    # After model$fit(tidy_text);
+    # Score (positive class = "discrim")
+    # Run on test dataset (tweet + label)
+
+    X_test <- test_clean$tweet
+    y_test <- test_clean$label
+
+    res <- model$score(X_test, y_test, positive = "discrim")
+
+    res$measurements      # tn, fp, fn, tp, precision, recall, f1, accuracy
+    res$confusion_matrix
+    res$topFP             # FP cases sample table
+    res$topFN             # FN cases sample table        
+    ```
+
+    ```{r}
+    # Visualize confusion matrix
+    cm_df <- as.data.frame(res$confusion_matrix)
+    ggplot(cm_df, aes(x = Pred, y = Truth, fill = Freq)) +
+      geom_tile(color = "white") +
+      geom_text(aes(label = Freq), fontface = 2) +
+      labs(title = "Confusion matrix (counts)", x = "Predicted", y = "True") +
+      theme_minimal() -> p1
+    print(p1)
+    ```
+
+    ```{r}
+    # Visualize predictance balance
+    bal <- as.data.frame(prop.table(table(res$y_pred)))
+    names(bal) <- c("label","prop")
+    ggplot(bal, aes(label, prop)) + 
+      geom_col() + 
+      labs(title = "Predicted class balance", x = NULL, y = "Proportion") + 
+      theme_minimal() -> p2
+    print(p2)
+    ```
+
+## Conclusions
+
+Summarize your work by explaining in a few sentences the points listed
+below.
+
+-   Describe the method implemented in general. Show what are
+    mathematical foundations you are basing your solution on.
+-   List pros and cons of the method. This should include the
+    limitations of your method, all the assumption you make about the
+    nature of your data etc.
+-   Explain why accuracy is not a good choice for the base metrics for
+    classification tasks. Why F1 score is always preferable?
