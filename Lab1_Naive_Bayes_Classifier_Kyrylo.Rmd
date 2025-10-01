@@ -221,7 +221,7 @@ naiveBayes <- setRefClass("naiveBayes",
 
                          word_probabilities <<- word_counts_complete %>% 
                            mutate(prob = (n + 1) / (total_word_counts[label] + vocabulary_size))
-                         return(list(classes, class_probabilities, total_word_counts, word_probabilities, vocabulary, vocabulary_size))
+                         return(list(classes = classes, class_probabilities = class_probabilities, total_word_counts = total_word_counts, word_probabilities = word_probabilities, vocabulary = vocabulary, vocabulary_size = vocabulary_size))
                     },
                     
                     # return prediction for a single message 
