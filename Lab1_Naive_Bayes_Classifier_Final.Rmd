@@ -102,7 +102,9 @@ library(tidytext)
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(stringr)
 library(tidyverse)
+
 ```
 
 ## Outline of the work
@@ -187,12 +189,17 @@ test_clean <- clean_data(test)
 tidy_text <- unnest_tokens(train_clean, 'word', 'tweet', token="words") %>%
              filter(!word %in% splitted_stop_words)%>%
               filter(nchar(word) > 2)  %>%
-              filter(str_detect(word, "^[a-z]+$"))
+              filter(str_detect(word, "^[a-z]+$"))%>%
+              filter(word != "user") %>%
+               filter(word != "amp")
+  
 
 tidy_test <- unnest_tokens(test_clean, 'word', 'tweet', token="words") %>%
              filter(!word %in% splitted_stop_words) %>%
              filter(nchar(word) > 2) %>%
-            filter(str_detect(word, "^[a-z]+$"))
+            filter(str_detect(word, "^[a-z]+$"))%>%
+            filter(word != "user") %>% 
+            filter(word != "amp")
 ```
 
 ```{r}
@@ -292,9 +299,9 @@ ggplot(top_tfidf, aes(x = tf_idf, y = word, fill = label)) +
   scale_y_reordered() +
   scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
   labs(
-    title = "Most Distinctive Words by Category (TF-IDF)",
+    title = "Most Distinctive Words by Category",
     subtitle = "Words that uniquely characterize discriminatory vs neutral tweets",
-    x = "TF-IDF Score (Importance)",
+    x = "TF-IDF Score",
     y = NULL
   ) +
   theme_minimal(base_size = 12) +
