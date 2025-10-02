@@ -96,11 +96,12 @@ parts to test the classifierʼs possibilities on the unseen data.
 ```{r}
 # here goes a list of recommended libraries,
 # though you may install other ones if they are needed
-library(tidytext)
+
 library(readr)
 library(dplyr)
 library(ggplot2)
-library(tidyverse)
+library(tidytext)
+library(stringr)
 
 
 ```
@@ -163,7 +164,7 @@ train <-  read.csv(file = train_path, stringsAsFactors = FALSE)
 test <-  read.csv(file = test_path, stringsAsFactors = FALSE)
 ```
 
-``` {r}
+```{r}
 clean_data <-function(df){
   df$tweet <- df$tweet %>%
     str_replace_all("https?://\\S+|www\\.\\S+", "") %>%
@@ -182,7 +183,6 @@ train_clean <- clean_data(train)
 test_clean <- clean_data(test)
 ```
 
-
 ```{r}
 
 
@@ -196,7 +196,9 @@ tidy_test <- unnest_tokens(test_clean, 'word', 'tweet', token="words") %>%
              filter(!word %in% splitted_stop_words) %>%
              filter(nchar(word) > 2) %>%
             filter(str_detect(word, "^[a-z]+$"))
-
+tidy_text %>%
+  filter(id == 40) %>%  # look at tweet with id=1
+  count(word, sort = TRUE)
 ```
 
 ```{r}
@@ -228,8 +230,7 @@ start processing it. R has very powerful tools to make nice plots and
 visualization. Show what are the most common words for negative and
 positive examples as a histogram, word cloud etc. Be creative!
 
-
-``` {r}
+```{r}
 # Top 15 words per label
 top_words <- word_counts %>%
   group_by(label) %>%
@@ -250,9 +251,8 @@ ggplot(top_words, aes(x = word, y = n, fill = label)) +
   theme(plot.title = element_text(size = 16, face = "bold"))
 ```
 
-
 ```{r}
-# Enhanced bar chart with percentages
+
 tweet_dist <- tweet_counts %>%
   mutate(
     percentage = round(100 * n / sum(n), 1),
@@ -265,7 +265,7 @@ ggplot(tweet_dist, aes(x = label, y = n, fill = label)) +
   scale_fill_manual(values = c("discrim" = "#e74c3c", "neutral" = "#3498db")) +
   labs(
     title = "Dataset Distribution",
-    subtitle = "Balance between discriminatory and neutral tweets",
+    subtitle = "",
     x = NULL,
     y = "Number of Tweets"
   ) +
@@ -280,7 +280,6 @@ ggplot(tweet_dist, aes(x = label, y = n, fill = label)) +
 
 
 ```
-
 
 ```{r}
 # Calculate TF-IDF - finds distinctive words
@@ -353,10 +352,6 @@ wordcloud(
 title("Neutral Tweets", col.main = "#3498db", cex.main = 1.5, font.main = 2)
 
 par(mfrow = c(1, 1))
-
-
-```
-``` {r}
 
 
 ```
